@@ -337,7 +337,7 @@ object LinkParser {
                 return ParseResult(success = true, items = items)
             }
 
-            // 策略3: 先检查视频 (masterUrl 可能含 / 编码)，优先于图片
+            // 策略3: 视频提取 (masterUrl 可能含 / 编码)
             if (html.contains("masterUrl")) {
                 val decodedHtml = html.replace("\\u002F", "/")
                 val videoPattern = Regex("\"masterUrl\"\\s*:\\s*\"(https?://[^\"]+)\"")
@@ -346,26 +346,26 @@ object LinkParser {
                     val videoUrl = videoMatch.groupValues[1]
                     val title = extractTitleFromHtml(html)
                     android.util.Log.d("LinkParser", "从masterUrl提取视频: $videoUrl")
-                    // 同时提取图片（如果有）
-                    val images = mutableListOf<MediaItem>()
-                    val jsonPattern = Regex("\"imageList\"\\s*:\\s*\\[(.*?)\\]", RegexOption.DOT_MATCHES_ALL)
-                    val jsonMatch = jsonPattern.find(decodedHtml)
-                    if (jsonMatch != null) {
-                        val imgResult = parseXiaohongshuImageList(jsonMatch.groupValues[1])
-                        if (imgResult.success) images.addAll(imgResult.items ?: emptyList())
-                    }
-                    val allItems = mutableListOf(MediaItem(url = videoUrl, type = MediaType.VIDEO, title = title))
-                    allItems.addAll(images)
-                    return ParseResult(success = true, items = allItems)
+                    // 视频帖子不提取封面图片，只返回视频
+                    return ParseResult(
+                        success = true,
+                        items = listOf(MediaItem(url = videoUrl, type = MediaType.VIDEO, title = title))
+                    )
                 }
             }
 
-            // 策略4: 从 imageList 解析图片
-            val jsonPattern = Regex("\"imageList\"\\s*:\\s*\\[(.*?)\\]", RegexOption.DOT_MATCHES_ALL)
-            val jsonMatch = jsonPattern.find(html)
-            if (jsonMatch != null) {
-                val result = parseXiaohongshuImageList(jsonMatch.groupValues[1])
-                if (result.success) return result
+            // 策略4: 从 imageList 解析图片（使用括号匹配）
+            val decodedHtml2 = html.replace("\\u002F", "/")
+            val imageListIdx = decodedHtml2.indexOf("\"imageList\"")
+            if (imageListIdx >= 0) {
+                val bracketStart = decodedHtml2.indexOf("[", imageListIdx)
+                if (bracketStart >= 0) {
+                    val imageListJson = extractBalancedArray(decodedHtml2, bracketStart)
+                    if (imageListJson != null) {
+                        val result = parseXiaohongshuImageList(imageListJson)
+                        if (result.success) return result
+                    }
+                }
             }
 
             ParseResult(false, error = "无法解析此小红书链接，请复制完整的分享链接后重试")
@@ -520,13 +520,34 @@ object LinkParser {
         return try {
             val items = mutableListOf<MediaItem>()
             val decoded = imageListStr.replace("\\u002F", "/")
-            val urlPattern = Regex("\"url(?:Default)?\"\\s*:\\s*\"(https?://[^\"]+)\"")
-            urlPattern.findAll(decoded).forEach { match ->
-                val url = match.groupValues[1]
-                if (!items.any { it.url == url }) {
-                    items.add(MediaItem(url = url, type = MediaType.IMAGE))
+
+            // 按 imageObject 拆分，每个图片对象以 {"stream": 或 {"fileId": 开头
+            val imageObjects = decoded.split(Regex("\\{\"(?:stream|fileId|url)"))
+                .filter { it.isNotEmpty() }
+
+            for (obj in imageObjects) {
+                // 提取顶层 url（通常是 H5_DTL 高清图）
+                val topUrlPattern = Regex("\"url\"\\s*:\\s*\"(https?://[^\"]+)\"")
+                val topMatch = topUrlPattern.find(obj)
+                if (topMatch != null) {
+                    val url = topMatch.groupValues[1]
+                    if (!items.any { it.url == url }) {
+                        items.add(MediaItem(url = url, type = MediaType.IMAGE))
+                    }
+                    continue
+                }
+
+                // 回退：从 infoList 中找 H5_DTL 图片
+                val h5dtlPattern = Regex("\"imageScene\"\\s*:\\s*\"H5_DTL\"[^}]*\"url\"\\s*:\\s*\"(https?://[^\"]+)\"")
+                val h5Match = h5dtlPattern.find(obj)
+                if (h5Match != null) {
+                    val url = h5Match.groupValues[1]
+                    if (!items.any { it.url == url }) {
+                        items.add(MediaItem(url = url, type = MediaType.IMAGE))
+                    }
                 }
             }
+
             if (items.isNotEmpty()) ParseResult(success = true, items = items)
             else ParseResult(false, error = "未能提取图片列表")
         } catch (e: Exception) {
@@ -906,6 +927,36 @@ object LinkParser {
             else if (c == '}') {
                 depth--
                 if (depth == 0) return s.substring(0, i + 1)
+            }
+        }
+        return null
+    }
+
+    // 用括号匹配提取完整 JSON 数组
+    private fun extractBalancedArray(s: String, startIndex: Int): String? {
+        if (startIndex >= s.length || s[startIndex] != '[') return null
+        var depth = 0
+        var inString = false
+        var escape = false
+        for (i in startIndex until s.length) {
+            val c = s[i]
+            if (escape) {
+                escape = false
+                continue
+            }
+            if (c == '\\' && inString) {
+                escape = true
+                continue
+            }
+            if (c == '"') {
+                inString = !inString
+                continue
+            }
+            if (inString) continue
+            if (c == '[') depth++
+            else if (c == ']') {
+                depth--
+                if (depth == 0) return s.substring(startIndex, i + 1)
             }
         }
         return null

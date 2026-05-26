@@ -16,10 +16,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.mediabuild.downloader.DownloadManager
 import com.example.mediabuild.model.MediaItem
 import com.example.mediabuild.model.MediaType
@@ -99,20 +101,28 @@ fun HomeScreen() {
                 ) {
                     OutlinedButton(
                         onClick = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = clipboard.primaryClip
-                            if (clip != null && clip.itemCount > 0) {
-                                linkInput = clip.getItemAt(0).text.toString()
+                            if (linkInput.isNotEmpty()) {
+                                linkInput = ""
+                            } else {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = clipboard.primaryClip
+                                if (clip != null && clip.itemCount > 0) {
+                                    linkInput = clip.getItemAt(0).text.toString()
+                                }
                             }
                         },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF4CAF50)
+                            contentColor = if (linkInput.isNotEmpty()) Color(0xFFEF5350) else Color(0xFF4CAF50)
                         )
                     ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            if (linkInput.isNotEmpty()) Icons.Default.Close else Icons.Default.Share,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("粘贴")
+                        Text(if (linkInput.isNotEmpty()) "清除" else "粘贴")
                     }
 
                     Button(
@@ -313,19 +323,40 @@ fun ResultItem(item: MediaItem, index: Int, onDownload: () -> Unit) {
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = when (item.type) {
-                MediaType.VIDEO -> Icons.Default.PlayArrow
-                MediaType.IMAGE -> Icons.Default.Star
-                MediaType.IMAGE_SET -> Icons.Default.List
-            },
-            contentDescription = null,
-            tint = when (item.type) {
-                MediaType.VIDEO -> Color(0xFF2196F3)
-                else -> Color(0xFFFF9800)
-            },
-            modifier = Modifier.size(36.dp)
-        )
+        // 预览缩略图
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF2A2A2A)),
+            contentAlignment = Alignment.Center
+        ) {
+            val thumbnailUrl = if (item.type == MediaType.VIDEO) {
+                // 视频用封面图作为预览（如果有）
+                item.thumbnail.ifEmpty { item.url }
+            } else {
+                item.url
+            }
+
+            AsyncImage(
+                model = thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            )
+
+            // 视频类型显示播放图标覆盖
+            if (item.type == MediaType.VIDEO) {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
 
         Column(
             modifier = Modifier
