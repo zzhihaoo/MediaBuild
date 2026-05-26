@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">媒体下载器</string>
+    <string name="accessibility_service_description">用于检测屏幕上的视频和图片内容，方便您一键下载保存。</string>
+    <string name="overlay_notification_channel">悬浮窗服务</string>
+    <string name="download_notification_channel">下载通知</string>
+    <string name="download_complete">下载完成</string>
+    <string name="download_failed">下载失败</string>
+    <string name="link_input_hint">请输入视频或图文链接</string>
+    <string name="paste_link">粘贴链接</string>
+    <string name="start_parse">开始解析</string>
+    <string name="start_download">开始下载</string>
+    <string name="download_all">一键全部下载</string>
+    <string name="service_running">服务运行中</string>
+    <string name="service_stopped">服务已停止</string>
+    <string name="enable_accessibility">开启无障碍服务</string>
+    <string name="accessibility_not_enabled">无障碍服务未开启，请前往设置开启</string>
+    <string name="no_media_found">未检测到媒体内容</string>
+    <string name="parsing">解析中…</string>
+    <string name="downloading">下载中…</string>
+    <string name="save_to_gallery">已保存到相册</string>
+</resources>
