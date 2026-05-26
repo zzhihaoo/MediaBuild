@@ -125,10 +125,6 @@ app/src/main/java/com/example/mediabuild/
 - 无障碍服务在部分设备上可能被系统自动关闭
 - 小红书页面结构变化可能导致解析失败
 
-## 作者
-
-**zzhihaoo**
-
 ## 开源协议
 
 本项目仅供学习交流使用。

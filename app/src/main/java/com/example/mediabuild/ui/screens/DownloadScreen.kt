@@ -13,13 +13,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.mediabuild.downloader.DownloadManager
 import com.example.mediabuild.model.DownloadStatus
 import com.example.mediabuild.model.DownloadTask
+import com.example.mediabuild.model.MediaType
 
 @Composable
 fun DownloadScreen() {
@@ -120,20 +123,38 @@ fun DownloadTaskItem(task: DownloadTask) {
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = when (task.mediaItem.type) {
-                        com.example.mediabuild.model.MediaType.VIDEO -> Icons.Default.PlayArrow
-                        else -> Icons.Default.Star
-                    },
-                    contentDescription = null,
-                    tint = when (task.status) {
-                        DownloadStatus.COMPLETED -> Color(0xFF4CAF50)
-                        DownloadStatus.FAILED -> Color(0xFFEF5350)
-                        DownloadStatus.DOWNLOADING -> Color(0xFF2196F3)
-                        else -> Color(0xFF888888)
-                    },
-                    modifier = Modifier.size(32.dp)
-                )
+                // 预览缩略图
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF2A2A2A)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val thumbnailUrl = if (task.mediaItem.type == MediaType.VIDEO) {
+                        task.mediaItem.thumbnail.ifEmpty { task.mediaItem.url }
+                    } else {
+                        task.mediaItem.url
+                    }
+
+                    AsyncImage(
+                        model = thumbnailUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+
+                    if (task.mediaItem.type == MediaType.VIDEO) {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
 
                 Column(
                     modifier = Modifier

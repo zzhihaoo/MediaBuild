@@ -14,7 +14,7 @@ class XhsIntegrationTest {
         println("Error: ${result.error}")
         println("Items: ${result.items?.size}")
         result.items?.forEach {
-            println("  Type: ${it.type}, URL: ${it.url.take(80)}")
+            println("  Type: ${it.type}, URL: ${it.url.take(80)}, Thumbnail: ${it.thumbnail.take(80)}")
         }
         assertTrue("应该解析成功", result.success)
         assertTrue("应该有媒体内容", result.items?.isNotEmpty() == true)
@@ -27,7 +27,7 @@ class XhsIntegrationTest {
         println("Error: ${result.error}")
         println("Items: ${result.items?.size}")
         result.items?.forEach {
-            println("  Type: ${it.type}, URL: ${it.url.take(80)}")
+            println("  Type: ${it.type}, URL: ${it.url.take(80)}, Thumbnail: ${it.thumbnail.take(80)}")
         }
         assertTrue("应该解析成功", result.success)
         assertTrue("应该有媒体内容", result.items?.isNotEmpty() == true)

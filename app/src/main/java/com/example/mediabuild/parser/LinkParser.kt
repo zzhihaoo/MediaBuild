@@ -346,10 +346,27 @@ object LinkParser {
                     val videoUrl = videoMatch.groupValues[1]
                     val title = extractTitleFromHtml(html)
                     android.util.Log.d("LinkParser", "从masterUrl提取视频: $videoUrl")
-                    // 视频帖子不提取封面图片，只返回视频
+
+                    // 从 imageList 提取封面图作为视频缩略图
+                    var thumbnail = ""
+                    val imageListIdx = decodedHtml.indexOf("\"imageList\"")
+                    if (imageListIdx >= 0) {
+                        val bracketStart = decodedHtml.indexOf("[", imageListIdx)
+                        if (bracketStart >= 0) {
+                            val imageListJson = extractBalancedArray(decodedHtml, bracketStart)
+                            if (imageListJson != null) {
+                                val thumbPattern = Regex("\"url\"\\s*:\\s*\"(https?://[^\"]+)\"")
+                                val thumbMatch = thumbPattern.find(imageListJson)
+                                if (thumbMatch != null) {
+                                    thumbnail = thumbMatch.groupValues[1]
+                                }
+                            }
+                        }
+                    }
+
                     return ParseResult(
                         success = true,
-                        items = listOf(MediaItem(url = videoUrl, type = MediaType.VIDEO, title = title))
+                        items = listOf(MediaItem(url = videoUrl, type = MediaType.VIDEO, title = title, thumbnail = thumbnail))
                     )
                 }
             }
@@ -521,29 +538,27 @@ object LinkParser {
             val items = mutableListOf<MediaItem>()
             val decoded = imageListStr.replace("\\u002F", "/")
 
-            // 按 imageObject 拆分，每个图片对象以 {"stream": 或 {"fileId": 开头
-            val imageObjects = decoded.split(Regex("\\{\"(?:stream|fileId|url)"))
-                .filter { it.isNotEmpty() }
-
-            for (obj in imageObjects) {
-                // 提取顶层 url（通常是 H5_DTL 高清图）
-                val topUrlPattern = Regex("\"url\"\\s*:\\s*\"(https?://[^\"]+)\"")
-                val topMatch = topUrlPattern.find(obj)
-                if (topMatch != null) {
-                    val url = topMatch.groupValues[1]
-                    if (!items.any { it.url == url }) {
-                        items.add(MediaItem(url = url, type = MediaType.IMAGE))
-                    }
-                    continue
+            // 顶层 url 后面总是跟 "traceId"，用这个模式精确匹配每张图片的主 URL
+            val urlPattern = Regex("\"url\"\\s*:\\s*\"(https?://[^\"]+)\"\\s*,\\s*\"traceId\"")
+            urlPattern.findAll(decoded).forEach { match ->
+                val url = match.groupValues[1]
+                if (!items.any { it.url == url }) {
+                    items.add(MediaItem(url = url, type = MediaType.IMAGE))
                 }
+            }
 
-                // 回退：从 infoList 中找 H5_DTL 图片
-                val h5dtlPattern = Regex("\"imageScene\"\\s*:\\s*\"H5_DTL\"[^}]*\"url\"\\s*:\\s*\"(https?://[^\"]+)\"")
-                val h5Match = h5dtlPattern.find(obj)
-                if (h5Match != null) {
-                    val url = h5Match.groupValues[1]
-                    if (!items.any { it.url == url }) {
-                        items.add(MediaItem(url = url, type = MediaType.IMAGE))
+            // 回退：如果上面没匹配到（traceId 可能不存在），取每个 imageObject 的第一个 url
+            if (items.isEmpty()) {
+                // 按 "stream" 分割图片对象，取每个块的第一个 url
+                val chunks = decoded.split(Regex("\\{\"stream\""))
+                    .filter { it.contains("\"url\"") }
+                for (chunk in chunks) {
+                    val urlMatch = Regex("\"url\"\\s*:\\s*\"(https?://[^\"]+)\"").find(chunk)
+                    if (urlMatch != null) {
+                        val url = urlMatch.groupValues[1]
+                        if (!items.any { it.url == url }) {
+                            items.add(MediaItem(url = url, type = MediaType.IMAGE))
+                        }
                     }
                 }
             }
